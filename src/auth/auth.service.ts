@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto, LoginDto, VerifyOtpDto } from './dto/auth.dto';
 import * as bcrypt from 'bcryptjs';
 import { OtpService } from './otp.service';
+import { NotificationService } from '../notifications/notification.service';
 
 @Injectable()
 export class AuthService {
@@ -11,6 +12,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private otpService: OtpService,
+    private notificationService: NotificationService,
   ) {}
 
   async register(registerDto: RegisterDto) {
@@ -92,7 +94,7 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired OTP');
     }
 
-    await this.prisma.user.update({
+    const updatedUser = await this.prisma.user.update({
       where: { email },
       data: {
         isVerified: true,
@@ -100,6 +102,9 @@ export class AuthService {
         emailOtpExpiresAt: null,
       },
     });
+
+    // Create welcome notification
+    await this.notificationService.createWelcomeNotification(updatedUser.id, updatedUser.name);
 
     return { message: 'Email verified successfully' };
   }
@@ -130,5 +135,57 @@ export class AuthService {
     await this.otpService.sendEmailOtp(email, emailOtp, user.name);
 
     return { message: 'OTP sent successfully' };
+  }
+
+  async forgotPassword(email: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    const resetOtp = this.otpService.generateOtp();
+
+    await this.prisma.user.update({
+      where: { email },
+      data: {
+        emailOtp: resetOtp,
+        emailOtpExpiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
+      },
+    });
+
+    // Send password reset email
+    console.log(`Password reset OTP for ${email}: ${resetOtp}`);
+
+    return { message: 'Password reset OTP sent to your email' };
+  }
+
+  async resetPassword(email: string, otp: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    if (user.emailOtp !== otp || !user.emailOtpExpiresAt || user.emailOtpExpiresAt < new Date()) {
+      throw new BadRequestException('Invalid or expired OTP');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await this.prisma.user.update({
+      where: { email },
+      data: {
+        password: hashedPassword,
+        emailOtp: null,
+        emailOtpExpiresAt: null,
+      },
+    });
+
+    return { message: 'Password reset successfully' };
   }
 }

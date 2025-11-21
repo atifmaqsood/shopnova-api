@@ -2,10 +2,14 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrderDto, UpdateOrderStatusDto } from './order.dto';
 import { OrderStatus } from '@prisma/client';
+import { NotificationService } from '../notifications/notification.service';
 
 @Injectable()
 export class OrdersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationService: NotificationService,
+  ) {}
 
   async createOrder(userId: number, createOrderDto: CreateOrderDto) {
     const cart = await this.prisma.cart.findUnique({
@@ -76,6 +80,14 @@ export class OrdersService {
 
       return newOrder;
     });
+
+    // Create order confirmation notification
+    await this.notificationService.create(
+      userId,
+      'Order Confirmed',
+      `Your order #${order.id} has been confirmed and is being processed.`,
+      'SUCCESS' as any,
+    );
 
     return this.findOne(order.id);
   }
@@ -187,6 +199,9 @@ export class OrdersService {
         },
       },
     });
+
+    // Create order status update notification
+    await this.notificationService.createOrderNotification(order.userId, order.id, status);
 
     return order;
   }

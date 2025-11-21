@@ -29,6 +29,7 @@ model User {
   orders        Order[]
   cart          Cart?
   addresses     Address[]
+  notifications Notification[]
 }
 
 model Product {
@@ -103,10 +104,29 @@ model Address {
   updatedAt DateTime @updatedAt
 }
 
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
 enum OrderStatus {
   PENDING
   PROCESSING
   SHIPPED
   DELIVERED
   CANCELLED
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+  ORDER_UPDATE
 }
