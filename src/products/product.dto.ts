@@ -1,4 +1,5 @@
 import { IsString, IsNumber, IsOptional, IsArray, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateProductDto {
   @IsString()
@@ -7,14 +8,17 @@ export class CreateProductDto {
   @IsString()
   description: string;
 
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   price: number;
 
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   stock: number;
 
+  @Type(() => Number)
   @IsNumber()
   categoryId: number;
 
@@ -33,16 +37,19 @@ export class UpdateProductDto {
   description?: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   price?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   stock?: number;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   categoryId?: number;
 

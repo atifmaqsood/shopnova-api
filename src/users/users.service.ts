@@ -15,6 +15,7 @@ export class UsersService {
         email: true,
         name: true,
         phone: true,
+        profileImage: true,
         role: true,
         isVerified: true,
         createdAt: true,
@@ -28,15 +29,21 @@ export class UsersService {
     return user;
   }
 
-  async updateProfile(userId: number, updateProfileDto: UpdateProfileDto) {
+  async updateProfile(userId: number, updateProfileDto: UpdateProfileDto, file?: Express.Multer.File) {
+    const data = {
+      ...updateProfileDto,
+      ...(file && { profileImage: `/uploads/profiles/${file.filename}` }),
+    };
+    
     const user = await this.prisma.user.update({
       where: { id: userId },
-      data: updateProfileDto,
+      data,
       select: {
         id: true,
         email: true,
         name: true,
         phone: true,
+        profileImage: true,
         role: true,
         isVerified: true,
       },

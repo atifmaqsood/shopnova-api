@@ -6,13 +6,24 @@ import { CreateProductDto, UpdateProductDto } from './product.dto';
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createProductDto: CreateProductDto) {
+  async create(createProductDto: CreateProductDto, files?: Express.Multer.File[]) {
     const { images, ...productData } = createProductDto;
+    
+    // Process uploaded files
+    const imageUrls = files ? files.map(file => `/uploads/products/${file.filename}`) : [];
+    
+    console.log('Creating product with images:');
+    console.log('Files received:', files?.length || 0);
+    console.log('Image URLs:', imageUrls);
+    console.log('Images from DTO:', images);
+    
+    const finalImages = imageUrls.length > 0 ? imageUrls : (images || []);
+    console.log('Final images to save:', finalImages);
     
     return this.prisma.product.create({
       data: {
         ...productData,
-        images: images || [],
+        images: finalImages,
       },
       include: {
         category: true,
@@ -74,14 +85,17 @@ export class ProductsService {
     return product;
   }
 
-  async update(id: number, updateProductDto: UpdateProductDto) {
+  async update(id: number, updateProductDto: UpdateProductDto, files?: Express.Multer.File[]) {
     const { images, ...productData } = updateProductDto;
+    
+    // Process uploaded files
+    const imageUrls = files ? files.map(file => `/uploads/products/${file.filename}`) : [];
     
     const product = await this.prisma.product.update({
       where: { id },
       data: {
         ...productData,
-        ...(images && { images }),
+        ...(imageUrls.length > 0 ? { images: imageUrls } : images && { images }),
       },
       include: {
         category: true,

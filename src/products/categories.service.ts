@@ -6,10 +6,15 @@ import { CreateCategoryDto, UpdateCategoryDto } from './category.dto';
 export class CategoriesService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createCategoryDto: CreateCategoryDto) {
+  async create(createCategoryDto: CreateCategoryDto, file?: Express.Multer.File) {
     try {
+      const data = {
+        ...createCategoryDto,
+        image: file ? `/uploads/categories/${file.filename}` : null,
+      };
+      
       return await this.prisma.category.create({
-        data: createCategoryDto,
+        data,
       });
     } catch (error) {
       if (error.code === 'P2002') {
@@ -55,11 +60,16 @@ export class CategoriesService {
     return category;
   }
 
-  async update(id: number, updateCategoryDto: UpdateCategoryDto) {
+  async update(id: number, updateCategoryDto: UpdateCategoryDto, file?: Express.Multer.File) {
     try {
+      const data = {
+        ...updateCategoryDto,
+        ...(file && { image: `/uploads/categories/${file.filename}` }),
+      };
+      
       return await this.prisma.category.update({
         where: { id },
-        data: updateCategoryDto,
+        data,
       });
     } catch (error) {
       if (error.code === 'P2002') {

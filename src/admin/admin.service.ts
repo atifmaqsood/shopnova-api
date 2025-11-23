@@ -75,6 +75,7 @@ export class AdminService {
           email: true,
           name: true,
           phone: true,
+          profileImage: true,
           role: true,
           isVerified: true,
           createdAt: true,
