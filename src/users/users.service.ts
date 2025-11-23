@@ -30,26 +30,63 @@ export class UsersService {
   }
 
   async updateProfile(userId: number, updateProfileDto: UpdateProfileDto, file?: Express.Multer.File) {
-    const data = {
-      ...updateProfileDto,
-      ...(file && { profileImage: `/uploads/profiles/${file.filename}` }),
-    };
-    
-    const user = await this.prisma.user.update({
-      where: { id: userId },
-      data,
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        phone: true,
-        profileImage: true,
-        role: true,
-        isVerified: true,
-      },
-    });
+    try {
+      // Get current user data
+      const currentUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { phone: true }
+      });
+      
+      // Filter out undefined/null values
+      const updateData: any = {};
+      if (updateProfileDto.name !== undefined && updateProfileDto.name !== null && updateProfileDto.name.trim() !== '') {
+        updateData.name = updateProfileDto.name.trim();
+      }
+      if (updateProfileDto.phone !== undefined && updateProfileDto.phone !== null && updateProfileDto.phone.trim() !== '') {
+        const newPhone = updateProfileDto.phone.trim();
+        // Only check for duplicates if phone is actually changing
+        if (newPhone !== currentUser?.phone) {
+          const existingUser = await this.prisma.user.findFirst({
+            where: {
+              phone: newPhone,
+              NOT: { id: userId }
+            }
+          });
+          if (existingUser) {
+            throw new BadRequestException('Phone number is already in use');
+          }
+        }
+        updateData.phone = newPhone;
+      }
+      if (file) {
+        updateData.profileImage = `/uploads/profiles/${file.filename}`;
+      }
+      
+      const user = await this.prisma.user.update({
+        where: { id: userId },
+        data: updateData,
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          phone: true,
+          profileImage: true,
+          role: true,
+          isVerified: true,
+          createdAt: true,
+        },
+      });
 
-    return user;
+      return user;
+    } catch (error) {
+      if (error.code === 'P2025') {
+        throw new NotFoundException('User not found');
+      }
+      if (error.code === 'P2002') {
+        throw new BadRequestException('Phone number is already in use');
+      }
+      throw error;
+    }
   }
 
   async changePassword(userId: number, changePasswordDto: ChangePasswordDto) {

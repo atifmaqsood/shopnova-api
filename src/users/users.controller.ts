@@ -19,15 +19,48 @@ export class UsersController {
   @Put('profile')
   @UseInterceptors(FileInterceptor('profileImage', {
     storage: diskStorage({
-      destination: './uploads/profiles',
+      destination: (req, file, cb) => {
+        const fs = require('fs');
+        const dir = './uploads/profiles';
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        cb(null, dir);
+      },
       filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         cb(null, `profile-${uniqueSuffix}${extname(file.originalname)}`);
       },
     }),
+    fileFilter: (req, file, cb) => {
+      if (file.mimetype.match(/\/(jpg|jpeg|png|gif)$/)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only image files are allowed!'), false);
+      }
+    },
+    limits: {
+      fileSize: 5 * 1024 * 1024, // 5MB
+    },
   }))
   async updateProfile(@Request() req, @Body() updateProfileDto: UpdateProfileDto, @UploadedFile() file?: Express.Multer.File) {
-    return this.usersService.updateProfile(req.user.userId, updateProfileDto, file);
+    try {
+      console.log('Request body:', req.body);
+      console.log('Update DTO:', updateProfileDto);
+      console.log('File:', file);
+      console.log('User ID:', req.user.userId);
+      
+      const result = await this.usersService.updateProfile(req.user.userId, updateProfileDto, file);
+      return {
+        success: true,
+        message: 'Profile updated successfully',
+        data: result,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Profile update error:', error);
+      throw error;
+    }
   }
 
   @Put('change-password')
