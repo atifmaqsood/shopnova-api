@@ -13,7 +13,7 @@ export class AuthService {
     private jwtService: JwtService,
     private otpService: OtpService,
     private notificationService: NotificationService,
-  ) {}
+  ) { }
 
   async register(registerDto: RegisterDto) {
     const { email, password, name, phone } = registerDto;
@@ -51,7 +51,7 @@ export class AuthService {
 
   async login(loginDto: LoginDto) {
     const user = await this.validateUser(loginDto.email, loginDto.password);
-    
+
     if (!user.isVerified) {
       throw new UnauthorizedException('Please verify your email first');
     }
@@ -73,7 +73,7 @@ export class AuthService {
       where: { email },
     });
 
-    if (user && await bcrypt.compare(password, user.password)) {
+    if (user && user.password && await bcrypt.compare(password, user.password)) {
       return user;
     }
     throw new UnauthorizedException('Invalid credentials');
@@ -187,6 +187,51 @@ export class AuthService {
     });
 
     return { message: 'Password reset successfully' };
+  }
+
+  async validateGoogleUser(details: { email: string; firstName: string; lastName: string; picture: string; accessToken: string; googleId: string }) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: details.email },
+    });
+
+    if (user) {
+      if (!user.googleId) {
+        await this.prisma.user.update({
+          where: { email: details.email },
+          data: { googleId: details.googleId, profileImage: user.profileImage || details.picture },
+        });
+      }
+      return user;
+    }
+
+    const newUser = await this.prisma.user.create({
+      data: {
+        email: details.email,
+        name: `${details.firstName} ${details.lastName}`,
+        googleId: details.googleId,
+        profileImage: details.picture,
+        isVerified: true,
+        password: '', // No password for Google users
+      },
+    });
+
+    await this.notificationService.createWelcomeNotification(newUser.id, newUser.name);
+
+    return newUser;
+  }
+
+  async generateToken(user: any) {
+    const payload = { email: user.email, sub: user.id, role: user.role };
+    return {
+      access_token: this.jwtService.sign(payload),
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        profileImage: user.profileImage,
+      },
+    };
   }
 
   async getProfile(userId: number) {

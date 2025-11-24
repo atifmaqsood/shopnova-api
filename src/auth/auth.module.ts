@@ -8,6 +8,7 @@ import { OtpService } from './otp.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { GoogleStrategy } from './strategies/google.strategy';
 
 @Module({
   imports: [
@@ -22,7 +23,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, OtpService, JwtStrategy, LocalStrategy],
+  providers: [AuthService, OtpService, JwtStrategy, LocalStrategy, GoogleStrategy],
   exports: [AuthService, OtpService],
 })
-export class AuthModule {}
+export class AuthModule { }

@@ -13,39 +13,40 @@ enum Role {
 }
 
 model User {
-  id            Int      @id @default(autoincrement())
-  email         String   @unique
-  phone         String?  @unique
-  password      String
-  name          String
-  profileImage  String?
-  role          Role     @default(USER)
-  isVerified    Boolean  @default(false)
-  emailOtp      String?
+  id                Int            @id @default(autoincrement())
+  email             String         @unique
+  phone             String?        @unique
+  password          String?
+  googleId          String?        @unique
+  name              String
+  profileImage      String?
+  role              Role           @default(USER)
+  isVerified        Boolean        @default(false)
+  emailOtp          String?
   emailOtpExpiresAt DateTime?
-  phoneOtp      String?
+  phoneOtp          String?
   phoneOtpExpiresAt DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  orders        Order[]
-  cart          Cart?
-  addresses     Address[]
-  notifications Notification[]
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  orders            Order[]
+  cart              Cart?
+  addresses         Address[]
+  notifications     Notification[]
 }
 
 model Product {
-  id          Int      @id @default(autoincrement())
+  id          Int         @id @default(autoincrement())
   name        String
   description String
   price       Float
   stock       Int
   images      Json
   categoryId  Int
-  category    Category @relation(fields: [categoryId], references: [id])
+  category    Category    @relation(fields: [categoryId], references: [id])
   orderItems  OrderItem[]
   cartItems   CartItem[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
 }
 
 model Category {
@@ -59,11 +60,11 @@ model Category {
 }
 
 model Cart {
-  id        Int       @id @default(autoincrement())
-  userId    Int       @unique
-  user      User      @relation(fields: [userId], references: [id])
-  items     CartItem[]
-  total     Float     @default(0)
+  id     Int        @id @default(autoincrement())
+  userId Int        @unique
+  user   User       @relation(fields: [userId], references: [id])
+  items  CartItem[]
+  total  Float      @default(0)
 }
 
 model CartItem {
@@ -76,19 +77,19 @@ model CartItem {
 }
 
 model Order {
-  id          Int         @id @default(autoincrement())
-  userId      Int
-  user        User        @relation(fields: [userId], references: [id])
-  total       Float
-  status      OrderStatus @default(PENDING)
-  items       OrderItem[]
-  createdAt   DateTime    @default(now())
+  id        Int         @id @default(autoincrement())
+  userId    Int
+  user      User        @relation(fields: [userId], references: [id])
+  total     Float
+  status    OrderStatus @default(PENDING)
+  items     OrderItem[]
+  createdAt DateTime    @default(now())
 }
 
 model OrderItem {
-  id        Int   @id @default(autoincrement())
+  id        Int     @id @default(autoincrement())
   orderId   Int
-  order     Order @relation(fields: [orderId], references: [id])
+  order     Order   @relation(fields: [orderId], references: [id])
   productId Int
   product   Product @relation(fields: [productId], references: [id])
   quantity  Int
@@ -96,28 +97,28 @@ model OrderItem {
 }
 
 model Address {
-  id        Int     @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   userId    Int
-  user      User    @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
   street    String
   city      String
   state     String
   zipCode   String
   country   String
-  isDefault Boolean @default(false)
+  isDefault Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model Notification {
-  id        Int      @id @default(autoincrement())
+  id        Int              @id @default(autoincrement())
   userId    Int
-  user      User     @relation(fields: [userId], references: [id])
+  user      User             @relation(fields: [userId], references: [id])
   title     String
   message   String
   type      NotificationType @default(INFO)
-  isRead    Boolean  @default(false)
-  createdAt DateTime @default(now())
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
 }
 
 enum OrderStatus {

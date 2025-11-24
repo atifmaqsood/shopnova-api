@@ -5,7 +5,7 @@ import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async findById(id: number) {
     const user = await this.prisma.user.findUnique({
@@ -36,7 +36,7 @@ export class UsersService {
         where: { id: userId },
         select: { phone: true }
       });
-      
+
       // Filter out undefined/null values
       const updateData: any = {};
       if (updateProfileDto.name !== undefined && updateProfileDto.name !== null && updateProfileDto.name.trim() !== '') {
@@ -61,7 +61,7 @@ export class UsersService {
       if (file) {
         updateData.profileImage = `/uploads/profiles/${file.filename}`;
       }
-      
+
       const user = await this.prisma.user.update({
         where: { id: userId },
         data: updateData,
@@ -98,6 +98,10 @@ export class UsersService {
 
     if (!user) {
       throw new NotFoundException('User not found');
+    }
+
+    if (!user.password) {
+      throw new BadRequestException('You do not have a password set. Please use "Forgot Password" to set one.');
     }
 
     const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);

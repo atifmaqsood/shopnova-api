@@ -1,4 +1,5 @@
-import { Controller, Post, Body, UseGuards, Get, Request } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Get, Request, Res } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { RegisterDto, LoginDto, VerifyOtpDto } from './dto/auth.dto';
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
@@ -7,7 +8,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService) { }
 
   @Post('register')
   async register(@Body() registerDto: RegisterDto) {
@@ -44,5 +45,17 @@ export class AuthController {
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     const { email, otp, newPassword } = resetPasswordDto;
     return this.authService.resetPassword(email, otp, newPassword);
+  }
+
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  async googleAuth(@Request() req) { }
+
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleAuthRedirect(@Request() req, @Res() res) {
+    const { access_token } = await this.authService.generateToken(req.user);
+    // Redirect to frontend with token
+    res.redirect(`http://localhost:8080/login?token=${access_token}`);
   }
 }
