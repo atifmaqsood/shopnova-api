@@ -1,6 +1,6 @@
 # ShopNova API
 
-A modern, full-featured e-commerce backend API built with NestJS, featuring comprehensive authentication, role-based authorization, real-time notifications, and advanced async task processing.
+A modern, full-featured e-commerce backend API built with NestJS, featuring comprehensive authentication, role-based authorization, payment processing, real-time notifications, and advanced async task processing.
 
 ## 🚀 Overview
 
@@ -10,31 +10,43 @@ ShopNova API is a production-ready e-commerce platform backend that demonstrates
 
 - **Advanced Authentication & Authorization**
   - JWT-based authentication with Passport strategies
+  - **Google OAuth 2.0 integration** for social login
   - Role-based access control (USER & ADMIN)
   - Custom OTP verification system for email and phone
   - Password reset flow with secure token management
   - Protected routes with custom guards
+  - Session management with automatic token refresh
+
+- **Payment Processing**
+  - **Stripe integration** for secure card payments
+  - Payment intent creation and confirmation
+  - Order-payment linking with transaction IDs
+  - Support for multiple payment methods (Card, Cash on Delivery)
+  - Secure payment flow with client-side confirmation
 
 - **User Management**
-  - Complete profile management
+  - Complete profile management with image upload
   - Multiple address support with default selection
   - Password change functionality
   - Email and phone verification
   - User preferences and settings
+  - Google account linking
 
 - **Product & Catalog Management**
   - Full CRUD operations for products
   - Category-based organization
   - Product search and filtering
-  - Inventory management
-  - Image support with JSON storage
+  - Inventory management with stock tracking
+  - Multi-image support with file upload
+  - Product variants and pricing
 
 - **Shopping Cart & Orders**
   - Real-time cart operations
-  - Order creation and tracking
-  - Order status management
+  - Order creation with payment integration
+  - Order status management (PENDING, PROCESSING, SHIPPED, DELIVERED, CANCELLED)
   - Order history and details
   - Cart total calculations
+  - Shipping address management
 
 - **Notification System**
   - Email notifications via Nodemailer
@@ -42,13 +54,14 @@ ShopNova API is a production-ready e-commerce platform backend that demonstrates
   - Async email processing with BullMQ
   - Customizable notification templates
   - Unread notification tracking
+  - Order status update notifications
 
 - **Admin Panel**
-  - Dashboard with analytics
-  - User management
+  - Dashboard with analytics and charts
+  - User management with role assignment
   - Product and category management
   - Order oversight and status updates
-  - Role assignment capabilities
+  - Real-time statistics
 
 - **Background Processing**
   - BullMQ integration for async tasks
@@ -71,9 +84,15 @@ ShopNova API is a production-ready e-commerce platform backend that demonstrates
 ### Authentication & Security
 - **Passport.js** - Authentication middleware
 - **JWT (JSON Web Tokens)** - Secure token-based auth
+- **passport-google-oauth20** - Google OAuth strategy
 - **bcryptjs** - Password hashing
 - **passport-jwt** - JWT strategy for Passport
 - **passport-local** - Local strategy for Passport
+
+### Payment Processing
+- **Stripe** - Payment processing platform
+- **stripe (Node.js SDK)** - Official Stripe SDK
+- Payment intent API for secure transactions
 
 ### Queue & Background Jobs
 - **BullMQ 5.x** - Redis-based queue system
@@ -84,6 +103,11 @@ ShopNova API is a production-ready e-commerce platform backend that demonstrates
 - **Nodemailer 7.x** - Email sending
 - **Handlebars** - Email template engine
 - **@nestjs-modules/mailer** - NestJS mailer integration
+
+### File Upload & Storage
+- **Multer** - File upload middleware
+- **@nestjs/platform-express** - Express platform adapter
+- Local file storage with configurable paths
 
 ### Validation & Transformation
 - **class-validator** - Decorator-based validation
@@ -105,25 +129,28 @@ ShopNova API is a production-ready e-commerce platform backend that demonstrates
 ```
 shopnova-api/
 ├── prisma/
-│   └── schema.prisma          # Database schema
+│   ├── schema.prisma          # Database schema
+│   └── prisma.config.ts       # Prisma configuration
 ├── src/
 │   ├── admin/                 # Admin panel module
 │   ├── auth/                  # Authentication & authorization
 │   │   ├── dto/              # Auth DTOs
 │   │   ├── guards/           # Auth guards
-│   │   └── strategies/       # Passport strategies
+│   │   └── strategies/       # Passport strategies (JWT, Local, Google)
 │   ├── cart/                  # Shopping cart module
 │   ├── common/                # Shared utilities
 │   │   ├── decorators/       # Custom decorators
 │   │   └── guards/           # Common guards
 │   ├── notifications/         # Notification system
 │   ├── orders/                # Order management
+│   ├── payment/               # Payment processing (Stripe)
 │   ├── prisma/                # Prisma service
 │   ├── products/              # Product & category management
 │   ├── scheduling/            # Cron jobs & scheduled tasks
 │   ├── users/                 # User management
 │   ├── app.module.ts          # Root module
 │   └── main.ts                # Application entry point
+├── uploads/                   # File upload directory
 ├── test/                      # E2E tests
 └── package.json
 ```
@@ -132,29 +159,37 @@ shopnova-api/
 
 ### User Registration & Authentication Flow
 
-1. **Registration**
+1. **Traditional Registration**
    - User submits registration data
    - Password is hashed using bcrypt
    - OTP is generated and sent via email
    - User record created with `isVerified: false`
 
-2. **Email Verification**
+2. **Google OAuth Registration/Login**
+   - User clicks "Sign in with Google"
+   - Redirected to Google OAuth consent screen
+   - Google returns user profile data
+   - System creates/updates user account
+   - JWT token generated and returned
+   - User redirected to dashboard
+
+3. **Email Verification**
    - User receives OTP via email (async via BullMQ)
    - User submits OTP for verification
    - Account is activated upon successful verification
 
-3. **Login**
-   - User submits credentials
-   - Local strategy validates credentials
+4. **Login**
+   - User submits credentials (email/password or Google)
+   - Strategy validates credentials
    - JWT access token is generated and returned
    - Token includes user ID and role
 
-4. **Protected Routes**
+5. **Protected Routes**
    - JWT token validated on each request
    - Role-based guards check user permissions
    - Custom decorators extract user data
 
-### Shopping Flow
+### Shopping & Payment Flow
 
 1. **Browse Products**
    - Users view products and categories
@@ -167,13 +202,23 @@ shopnova-api/
    - Remove items
    - View cart total
 
-3. **Order Placement**
+3. **Checkout Process**
+   - Select shipping address
+   - Choose payment method (Card or Cash on Delivery)
+   - For card payments:
+     - Create Stripe payment intent
+     - Collect card details securely
+     - Confirm payment with Stripe
+     - Link payment to order
+
+4. **Order Placement**
    - Convert cart to order
+   - Save payment details (method, transaction ID)
    - Order confirmation email sent
    - Cart is cleared
    - Order status tracking begins
 
-4. **Order Tracking**
+5. **Order Tracking**
    - Users view order history
    - Real-time status updates
    - Email notifications on status changes
@@ -184,9 +229,11 @@ shopnova-api/
    - View system statistics
    - Monitor recent orders
    - User activity overview
+   - Revenue analytics
 
 2. **Product Management**
    - Create/update/delete products
+   - Upload product images
    - Manage categories
    - Update inventory
 
@@ -194,6 +241,7 @@ shopnova-api/
    - View all orders
    - Update order status
    - Process fulfillment
+   - Track payments
 
 4. **User Management**
    - View user list
@@ -203,7 +251,7 @@ shopnova-api/
 ### Notification System Flow
 
 1. **Event Triggered**
-   - System events (registration, orders, etc.)
+   - System events (registration, orders, status changes)
    - Email job added to BullMQ queue
 
 2. **Queue Processing**
@@ -220,11 +268,14 @@ shopnova-api/
 
 - **Password Security**: Bcrypt hashing with salt rounds
 - **JWT Tokens**: Secure token-based authentication
+- **OAuth 2.0**: Secure Google authentication
 - **Role-Based Access Control**: Guards enforce permissions
 - **OTP Verification**: Time-limited one-time passwords
 - **Input Validation**: class-validator on all inputs
 - **SQL Injection Protection**: Prisma parameterized queries
 - **Environment Variables**: Sensitive data in .env
+- **PCI Compliance**: Stripe handles sensitive payment data
+- **HTTPS**: Secure data transmission (production)
 
 ## 🎯 Advanced Patterns & Best Practices
 
@@ -259,7 +310,7 @@ cp .env.example .env
 npx prisma generate
 
 # Run database migrations
-npx prisma migrate dev
+npx prisma db push
 
 # Seed database (optional)
 npx prisma db seed
@@ -306,11 +357,21 @@ http://localhost:3000/api/docs
 
 ```env
 # Database
-DATABASE_URL="mysql://user:password@localhost:3306/shopnova"
+DATABASE_URL="mysql://user:password@localhost:3306/shopnova_db"
 
 # JWT
 JWT_SECRET="your-secret-key"
 JWT_EXPIRES_IN="7d"
+
+# Google OAuth
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+GOOGLE_CALLBACK_URL="http://localhost:3000/auth/google/callback"
+FRONTEND_URL="http://localhost:8080"
+
+# Stripe
+STRIPE_SECRET_KEY="sk_test_your_stripe_secret_key"
+STRIPE_PUBLISHABLE_KEY="pk_test_your_stripe_publishable_key"
 
 # Email
 SMTP_HOST="smtp.gmail.com"
@@ -346,7 +407,8 @@ NODE_ENV="development"
 This project demonstrates:
 
 - **Enterprise Architecture**: Scalable, maintainable code structure
-- **Authentication Patterns**: Modern auth with JWT and Passport
+- **Authentication Patterns**: Modern auth with JWT, Passport, and OAuth
+- **Payment Integration**: Secure payment processing with Stripe
 - **Queue Management**: Async processing with BullMQ
 - **Database Design**: Relational modeling with Prisma
 - **API Design**: RESTful endpoints with proper HTTP methods
@@ -354,6 +416,7 @@ This project demonstrates:
 - **Testing Strategies**: Unit and E2E test coverage
 - **Security Best Practices**: Industry-standard security measures
 - **TypeScript Mastery**: Advanced type system usage
+- **Third-party Integration**: OAuth and payment gateway integration
 
 ## 🤝 Contributing
 

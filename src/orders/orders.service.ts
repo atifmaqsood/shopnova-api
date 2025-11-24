@@ -9,7 +9,7 @@ export class OrdersService {
   constructor(
     private prisma: PrismaService,
     private notificationService: NotificationService,
-  ) {}
+  ) { }
 
   async createOrder(userId: number, createOrderDto: CreateOrderDto) {
     const cart = await this.prisma.cart.findUnique({
@@ -44,6 +44,9 @@ export class OrdersService {
           userId,
           total,
           status: OrderStatus.PENDING,
+          shippingAddress: createOrderDto.shippingAddress,
+          paymentMethod: createOrderDto.paymentMethod,
+          paymentIntentId: createOrderDto.paymentIntentId,
         },
       });
 
@@ -94,7 +97,7 @@ export class OrdersService {
 
   async findAll(userId?: number, page = 1, limit = 10) {
     const skip = (page - 1) * limit;
-    
+
     const where = userId ? { userId } : {};
 
     const [orders, total] = await Promise.all([
