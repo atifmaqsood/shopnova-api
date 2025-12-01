@@ -2,38 +2,55 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, 
 import { CartService } from './cart.service';
 import { AddToCartDto, UpdateCartItemDto } from './cart.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CacheService } from '../cache/cache.service';
 
 @Controller('cart')
 @UseGuards(JwtAuthGuard)
 export class CartController {
-  constructor(private readonly cartService: CartService) {}
+  constructor(
+    private readonly cartService: CartService,
+    private readonly cacheService: CacheService,
+  ) {}
 
   @Get()
-  getCart(@Request() req) {
-    return this.cartService.getCart(req.user.userId);
+  async getCart(@Request() req) {
+    const cacheKey = `cart:${req.user.userId}`;
+    return this.cacheService.getOrSet(
+      cacheKey,
+      () => this.cartService.getCart(req.user.userId),
+      300, // 5 minutes TTL
+    );
   }
 
   @Post('add')
-  addToCart(@Request() req, @Body() addToCartDto: AddToCartDto) {
-    return this.cartService.addToCart(req.user.userId, addToCartDto);
+  async addToCart(@Request() req, @Body() addToCartDto: AddToCartDto) {
+    const result = await this.cartService.addToCart(req.user.userId, addToCartDto);
+    await this.cacheService.del(`cart:${req.user.userId}`);
+    return result;
   }
 
   @Patch('items/:itemId')
-  updateCartItem(
+  async updateCartItem(
     @Request() req,
     @Param('itemId', ParseIntPipe) itemId: number,
     @Body() updateCartItemDto: UpdateCartItemDto,
   ) {
-    return this.cartService.updateCartItem(req.user.userId, itemId, updateCartItemDto);
+    const result = await this.cartService.updateCartItem(req.user.userId, itemId, updateCartItemDto);
+    await this.cacheService.del(`cart:${req.user.userId}`);
+    return result;
   }
 
   @Delete('items/:itemId')
-  removeFromCart(@Request() req, @Param('itemId', ParseIntPipe) itemId: number) {
-    return this.cartService.removeFromCart(req.user.userId, itemId);
+  async removeFromCart(@Request() req, @Param('itemId', ParseIntPipe) itemId: number) {
+    const result = await this.cartService.removeFromCart(req.user.userId, itemId);
+    await this.cacheService.del(`cart:${req.user.userId}`);
+    return result;
   }
 
   @Delete('clear')
-  clearCart(@Request() req) {
-    return this.cartService.clearCart(req.user.userId);
+  async clearCart(@Request() req) {
+    const result = await this.cartService.clearCart(req.user.userId);
+    await this.cacheService.del(`cart:${req.user.userId}`);
+    return result;
   }
 }

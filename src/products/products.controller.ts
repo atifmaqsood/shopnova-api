@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, ParseIntPipe, UseInterceptors, UploadedFiles, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, ParseIntPipe, UseInterceptors, UploadedFiles, Request, Inject } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { ProductsService } from './products.service';
 import { CreateProductDto, UpdateProductDto } from './product.dto';
@@ -8,10 +8,14 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import { CacheService } from '../cache/cache.service';
 
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(
+    private readonly productsService: ProductsService,
+    private readonly cacheService: CacheService,
+  ) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
@@ -35,22 +39,30 @@ export class ProductsController {
       fileSize: 5 * 1024 * 1024, // 5MB
     },
   }))
-  create(@Body() createProductDto: CreateProductDto, @UploadedFiles() files: Express.Multer.File[]) {
-    return this.productsService.create(createProductDto, files);
+  async create(@Body() createProductDto: CreateProductDto, @UploadedFiles() files: Express.Multer.File[]) {
+    const result = await this.productsService.create(createProductDto, files);
+    // Invalidate products list cache
+    await this.cacheService.delByPattern('products:');
+    return result;
   }
 
   @Get()
-  findAll(
+  async findAll(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('search') search?: string,
     @Query('categoryId') categoryId?: string,
   ) {
-    return this.productsService.findAll(
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 10,
-      search,
-      categoryId ? parseInt(categoryId) : undefined,
+    const pageNum = page ? parseInt(page) : 1;
+    const limitNum = limit ? parseInt(limit) : 10;
+    const categoryIdNum = categoryId ? parseInt(categoryId) : undefined;
+    
+    const cacheKey = `products:list:${pageNum}:${limitNum}:${search || 'all'}:${categoryIdNum || 'all'}`;
+    
+    return this.cacheService.getOrSet(
+      cacheKey,
+      () => this.productsService.findAll(pageNum, limitNum, search, categoryIdNum),
+      300, // 5 minutes TTL
     );
   }
 
@@ -80,8 +92,13 @@ export class ProductsController {
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.productsService.findOne(id);
+  async findOne(@Param('id', ParseIntPipe) id: number) {
+    const cacheKey = `products:${id}`;
+    return this.cacheService.getOrSet(
+      cacheKey,
+      () => this.productsService.findOne(id),
+      600, // 10 minutes TTL
+    );
   }
 
   @UseGuards(JwtAuthGuard)
@@ -112,14 +129,22 @@ export class ProductsController {
       fileSize: 5 * 1024 * 1024, // 5MB
     },
   }))
-  update(@Param('id', ParseIntPipe) id: number, @Body() updateProductDto: UpdateProductDto, @UploadedFiles() files?: Express.Multer.File[]) {
-    return this.productsService.update(id, updateProductDto, files);
+  async update(@Param('id', ParseIntPipe) id: number, @Body() updateProductDto: UpdateProductDto, @UploadedFiles() files?: Express.Multer.File[]) {
+    const result = await this.productsService.update(id, updateProductDto, files);
+    // Invalidate product cache
+    await this.cacheService.del(`products:${id}`);
+    await this.cacheService.delByPattern('products:list:');
+    return result;
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.productsService.remove(id);
+  async remove(@Param('id', ParseIntPipe) id: number) {
+    const result = await this.productsService.remove(id);
+    // Invalidate product cache
+    await this.cacheService.del(`products:${id}`);
+    await this.cacheService.delByPattern('products:list:');
+    return result;
   }
 }

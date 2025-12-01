@@ -8,10 +8,14 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { CacheService } from '../cache/cache.service';
 
 @Controller('categories')
 export class CategoriesController {
-  constructor(private readonly categoriesService: CategoriesService) {}
+  constructor(
+    private readonly categoriesService: CategoriesService,
+    private readonly cacheService: CacheService,
+  ) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
@@ -25,18 +29,28 @@ export class CategoriesController {
       },
     }),
   }))
-  create(@Body() createCategoryDto: CreateCategoryDto, @UploadedFile() file?: Express.Multer.File) {
-    return this.categoriesService.create(createCategoryDto, file);
+  async create(@Body() createCategoryDto: CreateCategoryDto, @UploadedFile() file?: Express.Multer.File) {
+    const result = await this.categoriesService.create(createCategoryDto, file);
+    await this.cacheService.delByPattern('categories:');
+    return result;
   }
 
   @Get()
-  findAll() {
-    return this.categoriesService.findAll();
+  async findAll() {
+    return this.cacheService.getOrSet(
+      'categories:list',
+      () => this.categoriesService.findAll(),
+      600, // 10 minutes TTL
+    );
   }
 
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.categoriesService.findOne(id);
+  async findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.cacheService.getOrSet(
+      `categories:${id}`,
+      () => this.categoriesService.findOne(id),
+      600, // 10 minutes TTL
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -51,14 +65,20 @@ export class CategoriesController {
       },
     }),
   }))
-  update(@Param('id', ParseIntPipe) id: number, @Body() updateCategoryDto: UpdateCategoryDto, @UploadedFile() file?: Express.Multer.File) {
-    return this.categoriesService.update(id, updateCategoryDto, file);
+  async update(@Param('id', ParseIntPipe) id: number, @Body() updateCategoryDto: UpdateCategoryDto, @UploadedFile() file?: Express.Multer.File) {
+    const result = await this.categoriesService.update(id, updateCategoryDto, file);
+    await this.cacheService.del(`categories:${id}`);
+    await this.cacheService.del('categories:list');
+    return result;
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.categoriesService.remove(id);
+  async remove(@Param('id', ParseIntPipe) id: number) {
+    const result = await this.categoriesService.remove(id);
+    await this.cacheService.del(`categories:${id}`);
+    await this.cacheService.del('categories:list');
+    return result;
   }
 }

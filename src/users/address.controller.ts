@@ -2,39 +2,63 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request, 
 import { AddressService } from './address.service';
 import { CreateAddressDto, UpdateAddressDto } from './address.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CacheService } from '../cache/cache.service';
 
 @Controller('addresses')
 @UseGuards(JwtAuthGuard)
 export class AddressController {
-  constructor(private readonly addressService: AddressService) {}
+  constructor(
+    private readonly addressService: AddressService,
+    private readonly cacheService: CacheService,
+  ) {}
 
   @Post()
-  create(@Request() req, @Body() createAddressDto: CreateAddressDto) {
-    return this.addressService.create(req.user.userId, createAddressDto);
+  async create(@Request() req, @Body() createAddressDto: CreateAddressDto) {
+    const result = await this.addressService.create(req.user.userId, createAddressDto);
+    await this.cacheService.delByPattern(`addresses:${req.user.userId}:`);
+    return result;
   }
 
   @Get()
-  findAll(@Request() req) {
-    return this.addressService.findAll(req.user.userId);
+  async findAll(@Request() req) {
+    const cacheKey = `addresses:${req.user.userId}:list`;
+    return this.cacheService.getOrSet(
+      cacheKey,
+      () => this.addressService.findAll(req.user.userId),
+      300, // 5 minutes TTL
+    );
   }
 
   @Get(':id')
-  findOne(@Request() req, @Param('id', ParseIntPipe) id: number) {
-    return this.addressService.findOne(req.user.userId, id);
+  async findOne(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    const cacheKey = `addresses:${req.user.userId}:${id}`;
+    return this.cacheService.getOrSet(
+      cacheKey,
+      () => this.addressService.findOne(req.user.userId, id),
+      300, // 5 minutes TTL
+    );
   }
 
   @Patch(':id')
-  update(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() updateAddressDto: UpdateAddressDto) {
-    return this.addressService.update(req.user.userId, id, updateAddressDto);
+  async update(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() updateAddressDto: UpdateAddressDto) {
+    const result = await this.addressService.update(req.user.userId, id, updateAddressDto);
+    await this.cacheService.del(`addresses:${req.user.userId}:${id}`);
+    await this.cacheService.del(`addresses:${req.user.userId}:list`);
+    return result;
   }
 
   @Delete(':id')
-  remove(@Request() req, @Param('id', ParseIntPipe) id: number) {
-    return this.addressService.remove(req.user.userId, id);
+  async remove(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    const result = await this.addressService.remove(req.user.userId, id);
+    await this.cacheService.del(`addresses:${req.user.userId}:${id}`);
+    await this.cacheService.del(`addresses:${req.user.userId}:list`);
+    return result;
   }
 
   @Patch(':id/set-default')
-  setDefault(@Request() req, @Param('id', ParseIntPipe) id: number) {
-    return this.addressService.setDefault(req.user.userId, id);
+  async setDefault(@Request() req, @Param('id', ParseIntPipe) id: number) {
+    const result = await this.addressService.setDefault(req.user.userId, id);
+    await this.cacheService.delByPattern(`addresses:${req.user.userId}:`);
+    return result;
   }
 }
