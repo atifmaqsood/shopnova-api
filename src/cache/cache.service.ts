@@ -15,28 +15,32 @@ export class CacheService implements OnModuleInit {
   ) { }
 
   async onModuleInit() {
-    // Initialize Redis client
-    this.redisClient = createClient({
-      socket: {
-        host: this.configService.get('REDIS_HOST', 'localhost'),
-        port: this.configService.get('REDIS_PORT', 6379),
-      },
-      password: this.configService.get('REDIS_PASSWORD') || undefined,
-    });
-
-    this.redisClient.on('error', (err) => {
-      this.logger.error('Redis Client Error', err);
-    });
-
-    this.redisClient.on('connect', () => {
-      this.logger.log('✅ Redis client connected successfully');
-    });
-
     try {
+      // Initialize Redis client
+      this.redisClient = createClient({
+        socket: {
+          host: this.configService.get('REDIS_HOST', 'localhost'),
+          port: this.configService.get('REDIS_PORT', 6379),
+          reconnectStrategy: false, // Completely disable reconnection
+          connectTimeout: 2000, // Fail fast
+        },
+        password: this.configService.get('REDIS_PASSWORD') || undefined,
+      });
+
+      // Suppress all error events
+      this.redisClient.on('error', () => {
+        // Silently ignore all Redis errors
+      });
+
+      this.redisClient.on('connect', () => {
+        this.logger.log('✅ Redis client connected successfully');
+      });
+
       await this.redisClient.connect();
       this.logger.log('✅ Redis client initialized successfully');
     } catch (error) {
-      this.logger.error('❌ Failed to connect to Redis', error);
+      this.logger.warn('⚠️ Redis not available - running without cache');
+      this.redisClient = null; // Set to null if connection fails
     }
   }
 
@@ -45,8 +49,7 @@ export class CacheService implements OnModuleInit {
    */
   async get<T = any>(key: string): Promise<T | undefined> {
     try {
-      if (!this.redisClient?.isOpen) {
-        this.logger.warn('Redis client not available');
+      if (!this.redisClient || !this.redisClient?.isOpen) {
         return undefined;
       }
 
@@ -70,8 +73,7 @@ export class CacheService implements OnModuleInit {
    */
   async set<T = any>(key: string, value: T, ttl?: number): Promise<void> {
     try {
-      if (!this.redisClient?.isOpen) {
-        this.logger.warn('Redis client not available');
+      if (!this.redisClient || !this.redisClient?.isOpen) {
         return;
       }
 
@@ -91,8 +93,7 @@ export class CacheService implements OnModuleInit {
    */
   async del(key: string): Promise<void> {
     try {
-      if (!this.redisClient?.isOpen) {
-        this.logger.warn('Redis client not available');
+      if (!this.redisClient || !this.redisClient?.isOpen) {
         return;
       }
 
@@ -108,8 +109,7 @@ export class CacheService implements OnModuleInit {
    */
   async reset(): Promise<void> {
     try {
-      if (!this.redisClient?.isOpen) {
-        this.logger.warn('Redis client not available');
+      if (!this.redisClient || !this.redisClient?.isOpen) {
         return;
       }
 
@@ -155,8 +155,7 @@ export class CacheService implements OnModuleInit {
    */
   async delByPattern(pattern: string): Promise<void> {
     try {
-      if (!this.redisClient?.isOpen) {
-        this.logger.warn('Redis client not available');
+      if (!this.redisClient || !this.redisClient?.isOpen) {
         return;
       }
 
